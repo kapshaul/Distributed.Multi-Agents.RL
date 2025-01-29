@@ -1,7 +1,10 @@
 import numpy as np
 import torch
-from train_evaluate import PPOTrainer
+
 import configparser
+
+from train_evaluate import PPOTrainer
+from utils.plot import plot_curves
 
 # Load configuration
 config = configparser.ConfigParser()
@@ -32,14 +35,22 @@ max_train_steps = int(config['TRAINING']['max_train_steps'])
 max_episode_steps = int(config['TRAINING']['max_episode_steps'])
 batch_size = int(config['TRAINING']['batch_size'])
 ppo_epochs = int(config['TRAINING']['ppo_epochs'])
+evaluation_episodes = int(config['TRAINING']['evaluation_episodes'])
 
 def main():
     PPO = PPOTrainer(ENV_ID, RENDER, hyperparameters)
 
-    # Train the agent
-    PPO.train(max_train_steps, max_episode_steps, batch_size, ppo_epochs)
-    # Evaluate the agent
-    avg_reward = PPO.evaluate(episodes=10)
+    train_reward_history, eval_reward_history = [], []
+    num_iterations = 5
+    train_steps = max_train_steps // num_iterations
+    for _ in range(num_iterations):
+        # Train the agent
+         PPO.train(train_steps, max_episode_steps, batch_size, ppo_epochs)
+        # Evaluate the agent
+         PPO.evaluate(max_episode_steps, episodes=evaluation_episodes)
+
+    # Plot the results
+    plot_curves(PPO.train_reward_log, PPO.eval_reward_log, PPO.train_step_log, train_steps)
 
 
 if __name__ == "__main__":

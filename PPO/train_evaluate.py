@@ -36,6 +36,10 @@ class PPOTrainer:
 
         self.rollout_buffer = RolloutBuffer()
 
+        self.episode, self.total_steps = 0, 0
+        self.train_reward_log, self.eval_reward_log = [], []
+        self.train_step_log = []
+
     def train(self, max_train_steps, max_episode_steps, batch_size, ppo_epochs):
         """
         Train
@@ -43,10 +47,8 @@ class PPOTrainer:
 
         state, info = self.env.reset()
         state = torch.FloatTensor(state).to(self.device)
-        episode = 0
-        total_steps = 0
-        current_steps = 0
         total_reward = 0
+        total_steps, steps = 0, 0
         while total_steps < max_train_steps:
             # Collect data for one batch
             self.rollout_buffer.clear()
@@ -65,16 +67,19 @@ class PPOTrainer:
                 )
 
                 state = torch.FloatTensor(next_state).to(self.device)
-                current_steps += 1
+                steps += 1
                 total_steps += 1
+                self.total_steps += 1
 
-                if done or current_steps >= max_episode_steps:
+                if done or steps >= max_episode_steps:
                     state, info = self.env.reset()
                     state = torch.FloatTensor(state).to(self.device)
 
-                    print(f"Episode: {episode + 1}      Rewards: {total_reward}")
-                    episode += 1
-                    total_reward, current_steps = 0, 0
+                    print(f"Episode: {self.episode + 1}      Rewards: {total_reward}")
+                    self.train_reward_log.append(total_reward)
+                    self.train_step_log.append(self.total_steps)
+                    self.episode += 1
+                    total_reward, steps = 0, 0
 
             # Compute advantages and returns
             with torch.no_grad():
@@ -84,21 +89,15 @@ class PPOTrainer:
             advantages, returns = self.agent.compute_advantages_returns(
                 self.rollout_buffer, last_value
             )
-
             # PPO update
             self.agent.update(self.rollout_buffer, advantages, returns, ppo_epochs)
 
-        if not(done) and total_steps >= max_train_steps:
-            print(f"Episode: Final      Rewards: {total_reward}")
-
-        print("Training finished.")
-
-    def evaluate(self, episodes=10):
+    def evaluate(self, max_episode_steps, episodes=10):
         """
         Evaluation
         """
 
-        self.env = gym.make(self.env_id, render_mode="human")
+        #self.env = gym.make(self.env_id, render_mode="human")
 
         total_rewards = []
         for episode in range(episodes):
@@ -106,16 +105,18 @@ class PPOTrainer:
             state = torch.FloatTensor(state).to(self.device)
             done = False
             episode_reward = 0
+            steps = 0
 
-            while not done:
+            while not done and steps < max_episode_steps:
                 action, _, _ = self.agent.select_action(state)
                 next_state, reward, done, info1, info2 = self.env.step(action)
                 episode_reward += reward
+                steps += 1
                 state = torch.FloatTensor(next_state).to(self.device)
 
             total_rewards.append(episode_reward)
-            print(f"Episode {episode + 1}:      Reward = {episode_reward}")
+            print(f"Evaluation {episode + 1},      Reward = {episode_reward}")
 
         avg_reward = sum(total_rewards) / len(total_rewards)
-        print(f"Average Reward over {episodes} episodes: {avg_reward}")
-        return avg_reward
+        print(f"Average Reward: {avg_reward}\n")
+        self.eval_reward_log.append(avg_reward)

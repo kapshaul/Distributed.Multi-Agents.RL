@@ -10,7 +10,7 @@ class FeatureScaler(nn.Module):
         super(FeatureScaler, self).__init__()
 
         # GNN matrix
-        F = torch.FloatTensor(self.gnn_normalize(adjacency_matrix))
+        #F = torch.FloatTensor(self.gnn_normalize(adjacency_matrix))
 
         # Register constant vector or matrix into the buffer
         self.register_buffer("F", F)
@@ -37,7 +37,6 @@ class PPONetwork(nn.Module):
         # Common layer
         self.common = nn.Sequential(
             nn.Linear(state_dim, hidden_size),
-            #FeatureScaler(hidden_size),
             #nn.Softmax(dim=-1),
             nn.Sigmoid(),
         )
