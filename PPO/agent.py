@@ -3,13 +3,16 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
-from model import PPONetwork
+from model import PPONetwork, PPONetwork_CNN
 
 
 class PPOAgent:
     def __init__(self, state_dim, action_dim, hidden_size, lr, gamma, lam, ppo_clip_eps, value_coef, entropy_coef,
                  device):
-        self.model = PPONetwork(state_dim, action_dim, hidden_size).to(device)
+        if len(state_dim) == 3:
+            self.model = PPONetwork_CNN(state_dim, action_dim, hidden_size).to(device)
+        else:
+            self.model = PPONetwork(state_dim, action_dim, hidden_size).to(device)
         self.device = device
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.gamma = gamma

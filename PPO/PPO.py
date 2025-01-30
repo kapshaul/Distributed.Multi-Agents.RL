@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import configparser
 import os
+from tqdm import tqdm
+from datetime import datetime
 
 from train_evaluate import PPOTrainer
 from utils.plot import plot_curves
@@ -45,8 +47,9 @@ def main():
     # PPO
     PPO = PPOTrainer(ENV_ID, RENDER, hyperparameters)
 
+    print(f"\n[INFO] Training started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
     train_steps = max_train_steps // num_iterations
-    for _ in range(num_iterations):
+    for _ in tqdm(range(num_iterations), desc="Processing"):
         # Train the agent
          PPO.train(train_steps, max_episode_steps, batch_size, ppo_epochs)
         # Evaluate the agent

@@ -23,7 +23,20 @@ class PPOTrainer:
             self.env = gym.make(env_id, render_mode="human")
         else:
             self.env = gym.make(env_id)
-        self.state_dim = self.env.observation_space.shape[0]
+        # Log environment information
+        print("===== Environment Information =====")
+        print(f"Environment ID: {env_id}")
+        print(f"Observation Space: {self.env.observation_space}")
+        print(f"Action Space: {self.env.action_space}")
+        print(f"Observation Space Shape: {self.env.observation_space.shape}")
+        print(f"Action Space Type: {'Discrete' if isinstance(self.env.action_space, gym.spaces.Discrete) else 'Continuous'}")
+        print(
+            f"Action Space Size: {self.env.action_space.n if isinstance(self.env.action_space, gym.spaces.Discrete) else self.env.action_space.shape}")
+        print(f"Max Episode Steps: {self.env.spec.max_episode_steps if self.env.spec else 'Unknown'}")
+        print(f"Reward Range: {self.env.reward_range}")
+        print(f"Environment Metadata: {self.env.metadata}")
+
+        self.state_dim = self.env.observation_space.shape
         self.action_dim = self.env.action_space.n
 
         # Initialize PPO agent
