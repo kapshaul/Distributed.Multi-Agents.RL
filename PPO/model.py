@@ -10,7 +10,7 @@ class FeatureScaler(nn.Module):
         super(FeatureScaler, self).__init__()
 
         # GNN matrix
-        #F = torch.FloatTensor(self.gnn_normalize(adjacency_matrix))
+        F = torch.FloatTensor(self.gnn_normalize(adjacency_matrix))
 
         # Register constant vector or matrix into the buffer
         self.register_buffer("F", F)
@@ -34,10 +34,12 @@ class FeatureScaler(nn.Module):
 class PPONetwork(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_size):
         super(PPONetwork, self).__init__()
+        self.channel_size = 16
+        self.conv = nn.Conv2d(3, self.channel_size, kernel_size=3, padding=1)
+        self.pool = nn.AvgPool2d(2, 2)
         # Common layer
         self.common = nn.Sequential(
-            nn.Linear(state_dim, hidden_size),
-            #nn.Softmax(dim=-1),
+            nn.Linear(105*80*self.channel_size, hidden_size),
             nn.Sigmoid(),
         )
 
@@ -59,7 +61,13 @@ class PPONetwork(nn.Module):
         """
         Returns policy logits and state value
         """
-        x = x.view(-1, x.size(-1))
+        x = x.view(-1, 3, 210, 160)
+        x = self.conv(x)
+        x = self.pool(x)
+        #x = x.view(-1, 4, 105 * 80)
+        x = x.flatten(start_dim=1)
+
+        #x = x.view(-1, x.size(-1))
 
         features = self.common(x)
         logits = self.policy(features)

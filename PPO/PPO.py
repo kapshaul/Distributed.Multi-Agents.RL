@@ -1,7 +1,7 @@
 import numpy as np
 import torch
-
 import configparser
+import os
 
 from train_evaluate import PPOTrainer
 from utils.plot import plot_curves
@@ -19,10 +19,10 @@ hyperparameters = {
     "hidden_size": int(config['MODEL']['hidden_size']),
     "learning_rate": float(config['TRAINING']['learning_rate']),
     "gamma": float(config['TRAINING']['gamma']),
-    "lambda": float(config['TRAINING']['lambda']),
-    "ppo_clip_eps": float(config['TRAINING']['ppo_clip_eps']),
-    "value_coef": float(config['TRAINING']['value_coef']),
-    "entropy_coef": float(config['TRAINING']['entropy_coef']),
+    "lambda": float(config['PPO']['lambda']),
+    "ppo_clip_eps": float(config['PPO']['ppo_clip_eps']),
+    "value_coef": float(config['PPO']['value_coef']),
+    "entropy_coef": float(config['PPO']['entropy_coef']),
 }
 
 # Seed
@@ -34,14 +34,17 @@ np.random.seed(seed)
 max_train_steps = int(config['TRAINING']['max_train_steps'])
 max_episode_steps = int(config['TRAINING']['max_episode_steps'])
 batch_size = int(config['TRAINING']['batch_size'])
-ppo_epochs = int(config['TRAINING']['ppo_epochs'])
+ppo_epochs = int(config['PPO']['ppo_epochs'])
 evaluation_episodes = int(config['TRAINING']['evaluation_episodes'])
+num_iterations = int(config['TRAINING']['num_iterations'])
 
 def main():
+    torch.cuda.empty_cache()  # Clears cache to free unused memory
+    torch.cuda.ipc_collect()  # Collects unreferenced memory
+
+    # PPO
     PPO = PPOTrainer(ENV_ID, RENDER, hyperparameters)
 
-    train_reward_history, eval_reward_history = [], []
-    num_iterations = 5
     train_steps = max_train_steps // num_iterations
     for _ in range(num_iterations):
         # Train the agent
