@@ -1,33 +1,6 @@
-import numpy as np
-import torch
 import torch.nn as nn
 from torch.distributions import Categorical
-
-
-# Feature Scaler
-class FeatureScaler(nn.Module):
-    def __init__(self, hidden_size, adjacency_matrix=0):
-        super().__init__()
-
-        # GNN matrix
-        F = torch.FloatTensor(self.gnn_normalize(adjacency_matrix))
-
-        # Register constant vector or matrix into the buffer
-        self.register_buffer("F", F)
-
-    def gnn_normalize(self, adjacency_matrix):
-        # Add self-loops (optional, common in GNNs)
-        adjacency_matrix = adjacency_matrix + np.eye(adjacency_matrix.shape[0])
-        # Compute the degree matrix
-        degree_matrix = np.diag(np.sum(adjacency_matrix, axis=1))
-        # Compute D^(-1/2)
-        degree_inv_sqrt = np.linalg.inv(np.sqrt(degree_matrix))
-        # Compute the normalized adjacency matrix
-        normalized_adj = degree_inv_sqrt @ adjacency_matrix @ degree_inv_sqrt
-        return normalized_adj
-
-    def forward(self, x):
-        return x * self.F
+from utils.model import CustomLinear, CustomConv2D, FeatureScaler
 
 
 # PPO Network
@@ -37,7 +10,9 @@ class PPONetwork(nn.Module):
 
         # Common layer
         self.common = nn.Sequential(
-            nn.Linear(state_dim[0], hidden_size),
+            #nn.Linear(state_dim[0], hidden_size),
+            CustomLinear(state_dim[0], hidden_size, 0.9),
+            FeatureScaler(hidden_size),
             #nn.Softmax(dim=-1),
             nn.Sigmoid(),
         )
@@ -99,28 +74,47 @@ class PPONetwork(nn.Module):
 class PPONetwork_CNN(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_size):
         super().__init__()
+        """
+        Output size formula: 
+        O = 1 + (I - K + 2P) // S
+        where,
+        - I = Input size (height/width)
+        - K = Kernel size
+        - P = Padding
+        - S = Stride
+        """
 
-        self.state_dim = state_dim
-        kernel_size, stride = 2, 2
-        channel_size = 16
-        self.conv = nn.Conv2d(3, channel_size, kernel_size=3, padding=1)
-        self.pool = nn.AvgPool2d(kernel_size, stride)
-        pool_height = (state_dim[0] - kernel_size) // stride + 1
-        pool_width = (state_dim[1] - kernel_size) // stride + 1
+        self.conv1 = nn.Sequential(
+            # [N, 32, 20, 20]
+            nn.Conv2d(4, 64, kernel_size=8, stride=4, bias=False),
+            nn.BatchNorm2d(num_features=64, eps=1e-5, momentum=0.1),
+            nn.AvgPool2d(2, 2),
+            #nn.ReLU(),
+        )
+
+        self.conv2 = nn.Sequential(
+            # [N, 64, 9, 9]
+            nn.Conv2d(64, 16, kernel_size=3, stride=1, bias=False),
+            nn.BatchNorm2d(num_features=16, eps=1e-5, momentum=0.1),
+            nn.ReLU(),
+        )
+        #self.pool = nn.AvgPool2d(kernel_size, stride)
 
         # Common layer
         self.common = nn.Sequential(
-            nn.Linear(pool_height*pool_width*channel_size, hidden_size),
+            #nn.Linear(9*9*64, hidden_size),
+            CustomLinear(8*8*16, hidden_size, 0.9),
+            FeatureScaler(hidden_size),
             nn.Sigmoid(),
         )
 
         # Policy layer
         self.policy = nn.Sequential(
-            nn.Linear(hidden_size, action_dim)
+            nn.Linear(hidden_size, action_dim),
         )
         # Value layer
         self.value = nn.Sequential(
-            nn.Linear(hidden_size, 1)
+            nn.Linear(hidden_size, 1),
         )
 
         nn.init.zeros_(self.policy[0].weight)
@@ -133,8 +127,9 @@ class PPONetwork_CNN(nn.Module):
         Returns policy logits and state value
         """
 
-        x = x.view(-1, self.state_dim[2], self.state_dim[0], self.state_dim[1])
-        x = self.pool(self.conv(x))
+        x = x.view(-1, 4, 84, 84)
+        x = self.conv1(x)
+        x = self.conv2(x)
         x = x.flatten(start_dim=1)
 
         features = self.common(x)

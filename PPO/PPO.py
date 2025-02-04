@@ -6,7 +6,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from train_evaluate import PPOTrainer
-from utils.plot import plot_curves
+from utils.plot import plot_curves, plot_curves_train
 
 # Load configuration
 config = configparser.ConfigParser()
@@ -14,6 +14,7 @@ config.read('config.ini')
 
 # Environment
 ENV_ID = config['ENVIRONMENT']['env_id']
+EVALUATION = config.getboolean('ENVIRONMENT', 'evaluation')
 RENDER = config.getboolean('ENVIRONMENT', 'render')
 
 # Hyper-parameters
@@ -51,12 +52,16 @@ def main():
     train_steps = max_train_steps // num_iterations
     for _ in tqdm(range(num_iterations), desc="Processing"):
         # Train the agent
-         PPO.train(train_steps, max_episode_steps, batch_size, ppo_epochs)
-        # Evaluate the agent
-         PPO.evaluate(max_episode_steps, episodes=evaluation_episodes)
+        PPO.train(train_steps, max_episode_steps, batch_size, ppo_epochs)
+        if EVALUATION:
+            # Evaluate the agent
+            PPO.evaluate(max_episode_steps, episodes=evaluation_episodes)
 
     # Plot the results
-    plot_curves(PPO.train_reward_log, PPO.eval_reward_log, PPO.train_step_log, train_steps)
+    if EVALUATION:
+        plot_curves(PPO.train_reward_log, PPO.eval_reward_log, PPO.train_step_log, train_steps)
+    else:
+        plot_curves_train(PPO.train_reward_log, PPO.train_step_log)
 
 
 if __name__ == "__main__":

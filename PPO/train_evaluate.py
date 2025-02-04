@@ -1,5 +1,8 @@
 import gym
 import torch
+import numpy as np
+from gym.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
+
 from agent import PPOAgent
 from memory import RolloutBuffer
 
@@ -26,9 +29,7 @@ class PPOTrainer:
         # Log environment information
         print("===== Environment Information =====")
         print(f"Environment ID: {env_id}")
-        print(f"Observation Space: {self.env.observation_space}")
-        print(f"Action Space: {self.env.action_space}")
-        print(f"Observation Space Shape: {self.env.observation_space.shape}")
+        print(f"Observation Space: {self.env.observation_space.shape}")
         print(f"Action Space Type: {'Discrete' if isinstance(self.env.action_space, gym.spaces.Discrete) else 'Continuous'}")
         print(
             f"Action Space Size: {self.env.action_space.n if isinstance(self.env.action_space, gym.spaces.Discrete) else self.env.action_space.shape}")
@@ -49,6 +50,11 @@ class PPOTrainer:
 
         self.rollout_buffer = RolloutBuffer()
 
+        if len(self.state_dim) == 3:
+            self.env = GrayScaleObservation(self.env, keep_dim=True)
+            self.env = ResizeObservation(self.env, shape=84)
+            self.env = FrameStack(self.env, num_stack=4)
+
         self.episode, self.total_steps = 0, 0
         self.train_reward_log, self.eval_reward_log = [], []
         self.train_step_log = []
@@ -59,10 +65,9 @@ class PPOTrainer:
         """
 
         state, info = self.env.reset()
-        state = torch.FloatTensor(state).to(self.device)
-        total_reward = 0
-        total_steps, steps = 0, 0
-        while total_steps < max_train_steps:
+        state = torch.tensor(np.array(state), dtype=torch.float32, device=self.device)
+        total_reward, steps, epiosde_steps = 0, 0, 0
+        while steps < max_train_steps:
             # Collect data for one batch
             self.rollout_buffer.clear()
             for _ in range(batch_size):
@@ -79,20 +84,20 @@ class PPOTrainer:
                     value.item()
                 )
 
-                state = torch.FloatTensor(next_state).to(self.device)
+                state = torch.tensor(np.array(next_state), dtype=torch.float32, device=self.device)
                 steps += 1
-                total_steps += 1
+                epiosde_steps += 1
                 self.total_steps += 1
 
-                if done or steps >= max_episode_steps:
+                if done or epiosde_steps >= max_episode_steps:
                     state, info = self.env.reset()
-                    state = torch.FloatTensor(state).to(self.device)
+                    state = torch.tensor(np.array(state), dtype=torch.float32, device=self.device)
 
-                    print(f"Episode: {self.episode + 1}      Rewards: {total_reward}")
+                    print(f"Episode: {self.episode + 1}      Rewards: {total_reward}      Steps: {self.total_steps}")
                     self.train_reward_log.append(total_reward)
                     self.train_step_log.append(self.total_steps)
                     self.episode += 1
-                    total_reward, steps = 0, 0
+                    total_reward, epiosde_steps = 0, 0
 
             # Compute advantages and returns
             with torch.no_grad():
@@ -104,6 +109,7 @@ class PPOTrainer:
             )
             # PPO update
             self.agent.update(self.rollout_buffer, advantages, returns, ppo_epochs)
+        torch.save(self.agent.model.state_dict(), './model.pt')
 
     def evaluate(self, max_episode_steps, episodes=10):
         """
@@ -115,7 +121,7 @@ class PPOTrainer:
         total_rewards = []
         for episode in range(episodes):
             state, info = self.env.reset()
-            state = torch.FloatTensor(state).to(self.device)
+            state = torch.tensor(np.array(state), dtype=torch.float32, device=self.device)
             done = False
             episode_reward = 0
             steps = 0
@@ -125,7 +131,7 @@ class PPOTrainer:
                 next_state, reward, done, info1, info2 = self.env.step(action)
                 episode_reward += reward
                 steps += 1
-                state = torch.FloatTensor(next_state).to(self.device)
+                state = torch.tensor(np.array(next_state), dtype=torch.float32, device=self.device)
 
             total_rewards.append(episode_reward)
             print(f"Evaluation {episode + 1},      Reward = {episode_reward}")
