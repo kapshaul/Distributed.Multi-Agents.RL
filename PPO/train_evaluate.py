@@ -5,6 +5,7 @@ from gym.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
 
 from agent import PPOAgent
 from memory import RolloutBuffer
+from utils.preprocess import FrameSkipWrapper
 
 
 class PPOTrainer:
@@ -37,6 +38,12 @@ class PPOTrainer:
         print(f"Reward Range: {self.env.reward_range}")
         print(f"Environment Metadata: {self.env.metadata}")
 
+        if len(self.env.observation_space.shape) == 3:
+            self.env = FrameSkipWrapper(self.env, skip=4)
+            self.env = GrayScaleObservation(self.env, keep_dim=True)
+            self.env = ResizeObservation(self.env, shape=84)
+            self.env = FrameStack(self.env, num_stack=4)
+
         self.state_dim = self.env.observation_space.shape
         self.action_dim = self.env.action_space.n
 
@@ -49,11 +56,6 @@ class PPOTrainer:
         )
 
         self.rollout_buffer = RolloutBuffer()
-
-        if len(self.state_dim) == 3:
-            self.env = GrayScaleObservation(self.env, keep_dim=True)
-            self.env = ResizeObservation(self.env, shape=84)
-            self.env = FrameStack(self.env, num_stack=4)
 
         self.episode, self.total_steps = 0, 0
         self.train_reward_log, self.eval_reward_log = [], []
@@ -72,7 +74,7 @@ class PPOTrainer:
             self.rollout_buffer.clear()
             for _ in range(batch_size):
                 action, log_prob, value = self.agent.select_action(state)
-                next_state, reward, done, info1, info2 = self.env.step(action)
+                next_state, reward, done, truncated, info = self.env.step(action)
 
                 total_reward += reward
                 self.rollout_buffer.add(
@@ -113,7 +115,7 @@ class PPOTrainer:
 
     def evaluate(self, max_episode_steps, episodes=10):
         """
-        Evaluation
+        Evaluate
         """
 
         #self.env = gym.make(self.env_id, render_mode="human")
@@ -128,7 +130,7 @@ class PPOTrainer:
 
             while not done and steps < max_episode_steps:
                 action, _, _ = self.agent.select_action(state)
-                next_state, reward, done, info1, info2 = self.env.step(action)
+                next_state, reward, done, truncated, info = self.env.step(action)
                 episode_reward += reward
                 steps += 1
                 state = torch.tensor(np.array(next_state), dtype=torch.float32, device=self.device)

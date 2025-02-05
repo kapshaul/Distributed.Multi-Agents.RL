@@ -9,7 +9,7 @@ from model import PPONetwork, PPONetwork_CNN
 class PPOAgent:
     def __init__(self, state_dim, action_dim, hidden_size, lr, gamma, lam, ppo_clip_eps, value_coef, entropy_coef,
                  device):
-        if len(state_dim) == 3:
+        if len(state_dim) == 4:
             self.model = PPONetwork_CNN(state_dim, action_dim, hidden_size).to(device)
         else:
             self.model = PPONetwork(state_dim, action_dim, hidden_size).to(device)

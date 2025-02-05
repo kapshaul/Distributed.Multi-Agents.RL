@@ -335,17 +335,21 @@ class distributed_DQN_agent():
 
 ########################################################################################################################################
 ########################################################################################################################################
-training_episodes, test_interval = 10000, 50
-start_time = time.time()
-agent = distributed_DQN_agent(env_CartPole, hyperparams_CartPole)
-result = agent.learn_and_evaluate(training_episodes, test_interval, trials = 30)
-plot_result(result, test_interval, ["batch_update with target_model"])
-print()
-print("Time: ",time.time() - start_time)
-#run_time['Distributed DQN'] = time.time() - start_time
-#print("Learning time:\n")
-#print(run_time['Distributed DQN'])
+def main():
+    training_episodes, test_interval = 10000, 50
+    start_time = time.time()
+    agent = distributed_DQN_agent(env_CartPole, hyperparams_CartPole)
+    result = agent.learn_and_evaluate(training_episodes, test_interval, trials = 30)
+    plot_result(result, test_interval, ["batch_update with target_model"])
+    print()
+    print("Time: ",time.time() - start_time)
+    #run_time['Distributed DQN'] = time.time() - start_time
+    #print("Learning time:\n")
+    #print(run_time['Distributed DQN'])
 
-f = open(result_file, "a+")
-f.write(str(time.time() - start_time) + "\n")
-f.close()
+    f = open(result_file, "a+")
+    f.write(str(time.time() - start_time) + "\n")
+    f.close()
+
+if __name__ == "__main__":
+    main()
