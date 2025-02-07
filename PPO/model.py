@@ -109,7 +109,7 @@ class PPONetwork_CNN(nn.Module):
             #nn.Linear(9*9*64, hidden_size),
             CustomLinear(7*7*64, hidden_size, 0.9),
             FeatureScaler(hidden_size),
-            nn.Sigmoid(),
+            nn.ReLU(),
         )
 
         # Policy layer
