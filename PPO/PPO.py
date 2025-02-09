@@ -42,8 +42,9 @@ evaluation_episodes = int(config['TRAINING']['evaluation_episodes'])
 num_iterations = int(config['TRAINING']['num_iterations'])
 
 def main():
-    torch.cuda.empty_cache()  # Clears cache to free unused memory
-    torch.cuda.ipc_collect()  # Collects unreferenced memory
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()  # Clears cache to free unused memory
+        torch.cuda.ipc_collect()  # Collects unreferenced memory
 
     # PPO
     PPO = PPOTrainer(ENV_ID, RENDER, hyperparameters)
