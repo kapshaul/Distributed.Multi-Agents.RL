@@ -86,22 +86,22 @@ class PPONetwork_CNN(nn.Module):
 
         self.conv1 = nn.Sequential(
             # [N, 32, 20, 20]
-            nn.Conv2d(4, 128, kernel_size=8, stride=4, bias=False),
-            #nn.BatchNorm2d(num_features=32, eps=1e-5, momentum=0.1),
+            nn.Conv2d(4, 32, kernel_size=8, stride=4, bias=True),
+            nn.BatchNorm2d(num_features=32, eps=1e-5, momentum=0.1),
             #nn.AvgPool2d(4, 2),
-            #nn.Sigmoid(),
+            nn.Sigmoid(),
         )
 
         self.conv2 = nn.Sequential(
             # [N, 64, 9, 9]
-            nn.Conv2d(128, 64, kernel_size=4, stride=2, bias=True),
-            #nn.BatchNorm2d(num_features=64, eps=1e-5, momentum=0.1),
-            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, bias=True),
+            nn.BatchNorm2d(num_features=64, eps=1e-5, momentum=0.1),
+            nn.Sigmoid(),
         )
 
         self.conv3 = nn.Sequential(
             # [N, 64, 9, 9]
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, bias=False),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, bias=True),
             nn.BatchNorm2d(num_features=64, eps=1e-5, momentum=0.1),
             nn.Sigmoid(),
         )
