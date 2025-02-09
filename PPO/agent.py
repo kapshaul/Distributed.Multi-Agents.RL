@@ -7,13 +7,16 @@ from model import PPONetwork, PPONetwork_CNN
 
 
 class PPOAgent:
-    def __init__(self, state_dim, action_dim, hidden_size, lr, gamma, lam, ppo_clip_eps, value_coef, entropy_coef,
-                 device):
-        if len(state_dim) == 4:
+    def __init__(self, state_dim, action_dim, hidden_size, lr, gamma, lam,
+                 ppo_clip_eps, value_coef, entropy_coef, device):
+        self.device = device
+
+        # Choose network architecture based on the provided state_dim.
+        # Here, if state_dim has length 4, we assume an image-like state input and select a CNN.
+        if hasattr(state_dim, '__len__') and len(state_dim) == 4:
             self.model = PPONetwork_CNN(state_dim, action_dim, hidden_size).to(device)
         else:
             self.model = PPONetwork(state_dim, action_dim, hidden_size).to(device)
-        self.device = device
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.gamma = gamma
         self.lam = lam
@@ -42,7 +45,7 @@ class PPOAgent:
 
         for _ in range(ppo_epochs):
             new_log_probs, entropy, values = self.model.evaluate_actions(b_states, b_actions)
-            ratio = (new_log_probs - b_log_probs).exp().to(self.device)
+            ratio = (new_log_probs - b_log_probs).exp()
 
             surr1 = ratio * advantages
             surr2 = torch.clamp(ratio, 1.0 - self.ppo_clip_eps, 1.0 + self.ppo_clip_eps) * advantages
