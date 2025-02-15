@@ -35,6 +35,7 @@ def masking_matrix(m, n, p):
         matrix[i, one_indices] = 1
     return matrix
 
+
 # Feature Scaler
 class FeatureScaler(nn.Module):
     def __init__(self, hidden_size=0, adjacency_matrix=0):
@@ -68,6 +69,7 @@ class FeatureScaler(nn.Module):
 
     def forward(self, x):
         return x * self.F + self.b
+
 
 # Customized linear weight matrix to mask
 class CustomLinear(nn.Module):
@@ -112,6 +114,7 @@ class CustomLinear(nn.Module):
         masked_weight = self.weight * self.mask
         return F.linear(x, masked_weight, self.bias)
 
+
 # Customized convolution weight matrix to mask
 class CustomConv2D(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True):
@@ -122,14 +125,18 @@ class CustomConv2D(nn.Module):
         self.stride = stride
         self.padding = padding
 
-        # Initialize filters (weights) and biases
-        scale_factors = torch.randn(out_channels, 1, 1, 1) * torch.FloatTensor([np.sqrt(2/np.pi)])
-        self.weights = nn.Parameter(torch.randn(out_channels, in_channels, kernel_size, kernel_size) * scale_factors)
+        self.weights = nn.Parameter(torch.randn(out_channels, in_channels, kernel_size, kernel_size))
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_channels))
-            self.b = True
+            self.use_bias = True
         else:
-            self.b = False
+            self.use_bias = False
+
+        # Initialize filters (weights) and biases
+        self.register_buffer(
+            "scale_factors",
+            torch.randn(out_channels, 1, 1, 1) * torch.tensor([np.sqrt(2 / np.pi)], dtype=torch.float32)
+        )
 
     def forward(self, x):
         batch_size, _, height, width = x.shape
@@ -141,7 +148,8 @@ class CustomConv2D(nn.Module):
         unfolded = F.unfold(x, kernel_size=self.kernel_size, stride=self.stride)
 
         # Reshape filters to match unfolded input
-        weight_matrix = self.weights.view(self.out_channels, -1)
+        weight_matrix = self.weights * self.scale_factors
+        weight_matrix = weight_matrix.view(self.out_channels, -1)
 
         # Perform matrix multiplication
         conv_out = weight_matrix @ unfolded  # (out_channels, num_patches * batch_size)
@@ -153,7 +161,7 @@ class CustomConv2D(nn.Module):
         conv_out = conv_out.view(batch_size, self.out_channels, out_height, out_width)
 
         # Add bias
-        if self.b:
+        if self.use_bias:
             conv_out += self.bias.view(1, self.out_channels, 1, 1)
 
         return conv_out
