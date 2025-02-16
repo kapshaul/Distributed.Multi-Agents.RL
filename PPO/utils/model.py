@@ -36,25 +36,23 @@ def masking_matrix(m, n, p):
     return matrix
 
 
-# Feature Scaler
-class FeatureScaler(nn.Module):
-    def __init__(self, hidden_size=0, adjacency_matrix=0):
+# Feature Transformer
+class FeatureTransform(nn.Module):
+    def __init__(self, hidden_size=0, adjacency_matrix=None):
         super().__init__()
 
-        # Masking matrix
-        #F = self.masking_matrix(1024, 8, p=0.5)
-
-        # GNN matrix
-        #F = torch.FloatTensor(self.gnn_normalize(adjacency_matrix))
-
-        # Scaler vector
-        scale = torch.FloatTensor([np.sqrt(2/np.pi)])
-        F = torch.randn(hidden_size)/scale
-        b = torch.randn(hidden_size) / scale
+        if adjacency_matrix is not None:
+            # GNN matrix
+            F = torch.FloatTensor(self.gnn_normalize(adjacency_matrix))
+            self.GNN = True
+        else:
+            # Scaler vector
+            scale = torch.FloatTensor([np.sqrt(np.pi) / 2])
+            F = torch.randn(hidden_size) * scale
+            self.GNN = False
 
         # Register constant vector or matrix into the buffer
         self.register_buffer("F", F)
-        self.register_buffer("b", b)
 
     def gnn_normalize(self, adjacency_matrix):
         # Add self-loops (optional, common in GNNs)
@@ -68,7 +66,10 @@ class FeatureScaler(nn.Module):
         return normalized_adj
 
     def forward(self, x):
-        return x * self.F + self.b
+        if self.GNN:
+            return torch.matmul(x, self.F)
+        else:
+            return x * self.F
 
 
 # Customized linear weight matrix to mask
@@ -83,10 +84,13 @@ class CustomLinear(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
 
-        mask = masking_matrix(in_features, out_features, p)
-        # Register the mask as a buffer so it is moved to GPU if model.cuda() is called,
-        # but does not count as a trainable parameter.
-        self.register_buffer('mask', mask)
+        if p != 1.0:
+            mask = masking_matrix(in_features, out_features, p)
+            # Register the mask as a buffer so it is moved to GPU if model.cuda() is called,
+            # but does not count as a trainable parameter.
+            self.register_buffer('mask', mask)
+        else:
+            self.mask = None
 
         # Create the usual weight and (optionally) bias parameters
         self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
@@ -98,9 +102,15 @@ class CustomLinear(nn.Module):
         # Initialize parameters
         self.reset_parameters()
 
+        # Scaler vector
+        scale = torch.FloatTensor([np.sqrt(np.pi) / 2])
+        F = torch.randn(out_features) * scale
+
+        # Register constant vector or matrix into the buffer
+        self.register_buffer("F", F.unsqueeze(1))
+
     def reset_parameters(self):
-        # You can use any initialization you like here.
-        # For example, kaiming_uniform_ is a common choice:
+        # Initialization weights, Kaiming uniform is a common choice
         nn.init.kaiming_uniform_(self.weight, a=5 ** 0.5)
 
         if self.bias is not None:
@@ -110,58 +120,34 @@ class CustomLinear(nn.Module):
             nn.init.uniform_(self.bias, -bound, bound)
 
     def forward(self, x):
-        # element-wise multiply the weight by the mask
-        masked_weight = self.weight * self.mask
-        return F.linear(x, masked_weight, self.bias)
+        if self.mask is not None:
+            # Element-wise multiply the weight by the mask
+            weight = self.weight * self.mask
+        else:
+            weight = self.weight
+        weight *= self.F
+        return F.linear(x, weight, self.bias)
 
 
 # Customized convolution weight matrix to mask
 class CustomConv2D(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True):
         super().__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
 
-        self.weights = nn.Parameter(torch.randn(out_channels, in_channels, kernel_size, kernel_size))
-        if bias:
-            self.bias = nn.Parameter(torch.zeros(out_channels))
-            self.use_bias = True
-        else:
-            self.use_bias = False
-
         # Initialize filters (weights) and biases
+        self.weights = nn.Parameter(torch.empty(out_channels, in_channels, kernel_size, kernel_size))
+        self.bias = nn.Parameter(torch.zeros(out_channels)) if bias else None
+        torch.nn.init.kaiming_normal_(self.weights, mode='fan_in', nonlinearity='relu')
+
+        # Initialize scaling factor
         self.register_buffer(
-            "scale_factors",
-            torch.randn(out_channels, 1, 1, 1) * torch.tensor([np.sqrt(2 / np.pi)], dtype=torch.float32)
+            "scale",
+            torch.randn(out_channels, 1, 1, 1) * torch.FloatTensor([np.sqrt(np.pi) / 2])
         )
 
     def forward(self, x):
-        batch_size, _, height, width = x.shape
-
-        # Apply padding
-        x = F.pad(x, (self.padding, self.padding, self.padding, self.padding))
-
-        # Unfold the input to extract patches
-        unfolded = F.unfold(x, kernel_size=self.kernel_size, stride=self.stride)
-
-        # Reshape filters to match unfolded input
-        weight_matrix = self.weights * self.scale_factors
-        weight_matrix = weight_matrix.view(self.out_channels, -1)
-
-        # Perform matrix multiplication
-        conv_out = weight_matrix @ unfolded  # (out_channels, num_patches * batch_size)
-        conv_out = conv_out.view(batch_size, self.out_channels, -1)
-
-        # Reshape back to image shape
-        out_height = (height + 2 * self.padding - self.kernel_size) // self.stride + 1
-        out_width = (width + 2 * self.padding - self.kernel_size) // self.stride + 1
-        conv_out = conv_out.view(batch_size, self.out_channels, out_height, out_width)
-
-        # Add bias
-        if self.use_bias:
-            conv_out += self.bias.view(1, self.out_channels, 1, 1)
-
-        return conv_out
+        # Element-wise multiply the weight with scale factor
+        scaled_w = self.weights * self.scale
+        return F.conv2d(x, scaled_w, bias=self.bias, stride=self.stride, padding=self.padding)

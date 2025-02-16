@@ -49,20 +49,15 @@ def main():
     # PPO
     PPO = PPOTrainer(ENV_ID, RENDER, hyperparameters)
 
+    # Start to train the PPO agent
     print(f"\n[INFO] Training started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
     train_steps = max_train_steps // num_iterations
     for _ in tqdm(range(num_iterations), desc="Processing"):
         # Train the agent
         PPO.train(train_steps, max_episode_steps, batch_size, ppo_epochs)
-        if EVALUATION:
-            # Evaluate the agent
-            PPO.evaluate(max_episode_steps, episodes=evaluation_episodes)
 
-    # Plot the results
-    if EVALUATION:
-        plot_curves(PPO.train_reward_log, PPO.eval_reward_log, PPO.train_step_log, train_steps)
-    else:
-        plot_curves_train(PPO.train_reward_log, PPO.train_step_log)
+    # Plot the result
+    plot_curves_train(PPO.train_reward_log, PPO.train_step_log)
 
 
 if __name__ == "__main__":
