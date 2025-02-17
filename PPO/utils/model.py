@@ -79,7 +79,7 @@ class CustomLinear(nn.Module):
     performing the linear transformation.
     """
 
-    def __init__(self, in_features, out_features, p, bias=True):
+    def __init__(self, in_features, out_features, p, m, bias=True):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -105,6 +105,7 @@ class CustomLinear(nn.Module):
         # Scaler vector
         scale = torch.FloatTensor([np.sqrt(np.pi) / 2])
         F = torch.randn(out_features) * scale
+        F[torch.rand(out_features) < m] = 1.0
 
         # Register constant vector or matrix into the buffer
         self.register_buffer("F", F.unsqueeze(1))
@@ -131,7 +132,7 @@ class CustomLinear(nn.Module):
 
 # Customized convolution weight matrix to mask
 class CustomConv2D(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, m=1, bias=True):
         super().__init__()
         self.stride = stride
         self.padding = padding
@@ -142,10 +143,9 @@ class CustomConv2D(nn.Module):
         torch.nn.init.kaiming_normal_(self.weights, mode='fan_in', nonlinearity='relu')
 
         # Initialize scaling factor
-        self.register_buffer(
-            "scale",
-            torch.randn(out_channels, 1, 1, 1) * torch.FloatTensor([np.sqrt(np.pi) / 2])
-        )
+        scale = torch.randn(out_channels, 1, 1, 1) * torch.FloatTensor([np.sqrt(np.pi) / 2])
+        scale[torch.rand(out_channels) < m] = 1.0
+        self.register_buffer("scale", scale)
 
     def forward(self, x):
         # Element-wise multiply the weight with scale factor
