@@ -10,9 +10,9 @@ class PPONetwork(nn.Module):
 
         # Common layer
         self.common = nn.Sequential(
-            nn.Linear(state_dim[0], hidden_size),
-            FeatureTransform(hidden_size),
-            #CustomLinear(state_dim[0], hidden_size, 0.95),
+            #nn.Linear(state_dim[0], hidden_size),
+            #FeatureTransform(hidden_size),
+            CustomLinear(state_dim[0], hidden_size, 0.9, 0.4),
             #nn.Softmax(dim=-1),
             nn.Sigmoid(),
         )
@@ -86,31 +86,31 @@ class PPONetwork_CNN(nn.Module):
 
         self.conv1 = nn.Sequential(
             # [N, 32, 20, 20]
-            nn.Conv2d(4, 32, kernel_size=8, stride=4, bias=True),
-            #CustomConv2D(4, 32, kernel_size=8, stride=4, bias=True),
+            #nn.Conv2d(4, 32, kernel_size=8, stride=4, bias=True),
+            CustomConv2D(4, 32, kernel_size=8, stride=4, m=0.5, bias=True),
             #nn.AvgPool2d(4, 4),
             nn.ReLU(),
         )
 
         self.conv2 = nn.Sequential(
             # [N, 64, 9, 9]
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, bias=True),
-            #CustomConv2D(32, 64, kernel_size=4, stride=2, bias=True),
+            #nn.Conv2d(32, 64, kernel_size=4, stride=2, bias=True),
+            CustomConv2D(32, 64, kernel_size=4, stride=2, m=0.5, bias=True),
             nn.ReLU(),
         )
 
         self.conv3 = nn.Sequential(
             # [N, 64, 7, 7]
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, bias=True),
-            #CustomConv2D(64, 64, kernel_size=3, stride=1, bias=True),
+            #nn.Conv2d(64, 64, kernel_size=3, stride=1, bias=True),
+            CustomConv2D(64, 64, kernel_size=3, stride=1, m=0.5, bias=True),
             nn.ReLU(),
         )
 
         # Common layer
         self.common = nn.Sequential(
-            nn.Linear(7*7*64, hidden_size),
-            #CustomLinear(7*7*64, hidden_size, 0.9),
-            FeatureTransform(hidden_size),
+            #nn.Linear(7*7*64, hidden_size),
+            #FeatureTransform(hidden_size),
+            CustomLinear(7 * 7 * 64, hidden_size, 0.9, 0.4),
             nn.ReLU(),
         )
 
