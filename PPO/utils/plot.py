@@ -28,7 +28,7 @@ def plot_curves(train_reward_log, val_reward_log, train_step_log, train_steps):
 def plot_curves_train(train_reward_log, train_step_log):
     fig, ax1 = plt.subplots(figsize=(16, 9))
 
-    window_size = 10
+    window_size = 100
     rolling_avg = pd.Series(train_reward_log).rolling(window=window_size, min_periods=1).mean()
 
     color = 'tab:red'
