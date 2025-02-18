@@ -79,7 +79,7 @@ class CustomLinear(nn.Module):
     performing the linear transformation.
     """
 
-    def __init__(self, in_features, out_features, p, m, bias=True):
+    def __init__(self, in_features, out_features, p=1, m=0, bias=True):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -132,7 +132,7 @@ class CustomLinear(nn.Module):
 
 # Customized convolution weight matrix to mask
 class CustomConv2D(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, m=1, bias=True):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, m=0, bias=True):
         super().__init__()
         self.stride = stride
         self.padding = padding
