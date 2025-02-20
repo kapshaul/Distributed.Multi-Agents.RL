@@ -84,14 +84,6 @@ class CustomLinear(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
 
-        if p != 1.0:
-            mask = masking_matrix(in_features, out_features, p)
-            # Register the mask as a buffer so it is moved to GPU if model.cuda() is called,
-            # but does not count as a trainable parameter.
-            self.register_buffer('mask', mask)
-        else:
-            self.mask = None
-
         # Create the usual weight and (optionally) bias parameters
         self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
         if bias:
@@ -101,6 +93,14 @@ class CustomLinear(nn.Module):
 
         # Initialize parameters
         self.reset_parameters()
+
+        # Mask
+        if p != 1.0:
+            mask = masking_matrix(in_features, out_features, p)
+            # Register the mask into the buffer
+            self.register_buffer('mask', mask)
+        else:
+            self.mask = None
 
         # Scaler vector
         scale = torch.FloatTensor([np.sqrt(np.pi) / 2])
@@ -126,7 +126,7 @@ class CustomLinear(nn.Module):
             weight = self.weight * self.mask
         else:
             weight = self.weight
-        weight *= self.F
+        weight = weight * self.F
         return F.linear(x, weight, self.bias)
 
 
