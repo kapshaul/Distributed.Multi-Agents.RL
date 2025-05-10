@@ -61,7 +61,7 @@ class PPOTrainer:
         self.train_reward_log, self.eval_reward_log = [], []
         self.train_step_log = []
 
-    def train(self, max_train_steps, max_episode_steps, batch_size, ppo_epochs):
+    def train(self, max_train_steps, max_episode_steps, batch_size, ppo_epochs_base):
         """
         Train
         """
@@ -110,7 +110,9 @@ class PPOTrainer:
                 self.rollout_buffer, last_value
             )
             # PPO update
-            self.agent.update(self.rollout_buffer, advantages, returns, ppo_epochs)
+            # Max reward = 21 shifting rewards to [0, 42] with scale factor 20
+            ppo_epochs_update = int(ppo_epochs_base + ((torch.mean(returns).item() + 21) / 42) ** 3 * 95)
+            self.agent.update(self.rollout_buffer, advantages, returns, ppo_epochs_update)
         torch.save(self.agent.model.state_dict(), './model.pt')
 
     def evaluate(self, max_episode_steps, episodes=10):

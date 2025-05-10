@@ -18,6 +18,7 @@ class PPOAgent:
         else:
             self.model = PPONetwork(state_dim, action_dim, hidden_size).to(device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        #self.optimizer = optim.RMSprop(self.model.parameters(), lr=lr)
         self.gamma = gamma
         self.lam = lam
         self.ppo_clip_eps = ppo_clip_eps
