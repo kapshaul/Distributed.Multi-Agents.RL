@@ -1,6 +1,6 @@
 import torch.nn as nn
 from torch.distributions import Categorical
-from utils.model import CustomLinear, CustomConv2D, FeatureTransform
+from utils.model import CustomLinear, CustomConv2D, CustomMultiheadAttention, FeatureTransform
 
 
 # PPO Network
@@ -8,13 +8,19 @@ class PPONetwork(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_size):
         super().__init__()
 
-        # Common layer
-        self.common = nn.Sequential(
+        # Common layer 1
+        self.common1 = nn.Sequential(
             #nn.Linear(state_dim[0], hidden_size),
             #FeatureTransform(hidden_size),
             CustomLinear(state_dim[0], hidden_size, 0.9, 0.0),
             #nn.Softmax(dim=-1),
-            nn.Sigmoid(),
+            #nn.Sigmoid(),
+        )
+
+        # Common layer 2
+        self.common2 = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
         )
 
         # Policy layer
@@ -37,7 +43,8 @@ class PPONetwork(nn.Module):
         """
 
         x = x.view(-1, x.size(-1))
-        features = self.common(x)
+        features = self.common1(x)
+        features = self.common2(features)
         logits = self.policy(features)
         value = self.value(features)
         return logits, value
@@ -87,7 +94,7 @@ class PPONetwork_CNN(nn.Module):
         self.conv1 = nn.Sequential(
             # [N, 32, 20, 20]
             nn.Conv2d(4, 32, kernel_size=8, stride=4, bias=True),
-            #CustomConv2D(4, 32, kernel_size=8, stride=4, m=0.0, bias=True),
+            #CustomConv2D(4, 16, kernel_size=8, stride=4, m=0.0, bias=True),
             #nn.AvgPool2d(4, 4),
             nn.ReLU(),
         )
@@ -95,33 +102,44 @@ class PPONetwork_CNN(nn.Module):
         self.conv2 = nn.Sequential(
             # [N, 64, 9, 9]
             nn.Conv2d(32, 64, kernel_size=4, stride=2, bias=True),
-            #CustomConv2D(32, 64, kernel_size=4, stride=2, m=0.0, bias=True),
+            #CustomConv2D(16, 32, kernel_size=4, stride=2, m=0.0, bias=True),
             nn.ReLU(),
         )
 
         self.conv3 = nn.Sequential(
             # [N, 64, 7, 7]
             nn.Conv2d(64, 64, kernel_size=3, stride=1, bias=True),
-            #CustomConv2D(64, 64, kernel_size=3, stride=1, m=0.0, bias=True),
+            #CustomConv2D(32, 32, kernel_size=3, stride=1, m=0.0, bias=True),
             nn.ReLU(),
         )
 
+        #self.attn = nn.MultiheadAttention(embed_dim=64, num_heads=8, batch_first=True)
+        self.attn = CustomMultiheadAttention(embed_dim=64, num_heads=8, batch_first=True)
+        self.norm1 = nn.LayerNorm(64)
+
         # Common layer
-        self.common = nn.Sequential(
+        self.full_rank = nn.Sequential(
             #nn.Linear(7*7*64, hidden_size),
             #FeatureTransform(hidden_size),
             CustomLinear(7 * 7 * 64, hidden_size, 1.0, 0.0),
             #nn.Softmax(dim=-1),
+            #nn.ReLU(),
+        )
+
+        # Common layer
+        self.common2 = nn.Sequential(
+            nn.Linear(7 * 7 * 64, 7 * 7 * 64),
             nn.ReLU(),
         )
+        self.norm2 = nn.LayerNorm(7 * 7 * 64)
 
         # Policy layer
         self.policy = nn.Sequential(
-            nn.Linear(hidden_size, action_dim),
+            nn.Linear(7 * 7 * 64, action_dim),
         )
         # Value layer
         self.value = nn.Sequential(
-            nn.Linear(hidden_size, 1),
+            nn.Linear(7 * 7 * 64, 1),
         )
 
         nn.init.zeros_(self.policy[0].weight)
@@ -134,15 +152,26 @@ class PPONetwork_CNN(nn.Module):
         Returns policy logits and state value
         """
 
+        x = x / 255.0
         x = x.view(-1, 4, 84, 84)
+
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
-        x = x.flatten(start_dim=1)
 
-        features = self.common(x)
-        logits = self.policy(features)
-        value = self.value(features)
+        # B, F, H, W = x.shape
+        x = x.view(-1, 7 * 7, 64)
+
+        #x = x.flatten(start_dim=1)
+
+        features, _ = self.attn(x, x, x)
+        features = self.norm1(features + x)
+        features = features.flatten(start_dim=1)
+
+        out = self.common2(features)
+        out = self.norm2(out + features)
+        logits = self.policy(out)
+        value = self.value(out)
         return logits, value
 
     def get_action(self, state):

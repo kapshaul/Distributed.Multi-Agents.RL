@@ -1,3 +1,4 @@
 PPO/model.pt
 /.idea
 PPO/result.png
+*.log

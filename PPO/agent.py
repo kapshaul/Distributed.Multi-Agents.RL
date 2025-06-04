@@ -36,26 +36,43 @@ class PPOAgent:
         )
         return advantages, returns
 
-    def update(self, rollout_buffer, advantages, returns, ppo_epochs):
+    def update(self, rollout_buffer, advantages, returns, ppo_epochs, minibatch_size):
         b_states = torch.FloatTensor(np.array(rollout_buffer.states)).to(self.device)
         b_actions = torch.LongTensor(np.array(rollout_buffer.actions)).to(self.device)
         b_log_probs = torch.FloatTensor(np.array(rollout_buffer.log_probs)).to(self.device)
+        returns = returns.to(self.device)
 
         # Normalize advantages
         advantages = ((advantages - advantages.mean()) / (advantages.std() + 1e-8)).to(self.device)
 
+        batch_size = b_states.shape[0]
+        indices = np.arange(batch_size)
+
         for _ in range(ppo_epochs):
-            new_log_probs, entropy, values = self.model.evaluate_actions(b_states, b_actions)
-            ratio = (new_log_probs - b_log_probs).exp()
+            np.random.shuffle(indices)
 
-            surr1 = ratio * advantages
-            surr2 = torch.clamp(ratio, 1.0 - self.ppo_clip_eps, 1.0 + self.ppo_clip_eps) * advantages
-            policy_loss = -torch.min(surr1, surr2).mean()
+            for start in range(0, batch_size, minibatch_size):
+                end = start + minibatch_size
+                mb_idx = indices[start:end]
 
-            value_loss = nn.MSELoss()(values, returns.to(self.device))
+                mb_states = b_states[mb_idx]
+                mb_actions = b_actions[mb_idx]
+                mb_old_log_probs = b_log_probs[mb_idx]
+                mb_advantages = advantages[mb_idx]
+                mb_returns = returns[mb_idx]
 
-            loss = policy_loss + self.value_coef * value_loss - self.entropy_coef * entropy.mean()
+                # Compute Loss
+                new_log_probs, entropy, values = self.model.evaluate_actions(mb_states, mb_actions)
+                ratio = (new_log_probs - mb_old_log_probs).exp()
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+                surr1 = ratio * mb_advantages
+                surr2 = torch.clamp(ratio, 1.0 - self.ppo_clip_eps, 1.0 + self.ppo_clip_eps) * mb_advantages
+                policy_loss = -torch.min(surr1, surr2).mean()
+
+                value_loss = nn.MSELoss()(values, mb_returns)
+
+                loss = policy_loss + self.value_coef * value_loss - self.entropy_coef * entropy.mean()
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()

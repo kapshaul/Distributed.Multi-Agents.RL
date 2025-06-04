@@ -7,6 +7,8 @@ from agent import PPOAgent
 from memory import RolloutBuffer
 from utils.preprocess import FrameSkipWrapper
 
+from model import PPONetwork, PPONetwork_CNN
+
 
 class PPOTrainer:
     def __init__(self, env_id, render, hyperparameters):
@@ -61,10 +63,12 @@ class PPOTrainer:
         self.train_reward_log, self.eval_reward_log = [], []
         self.train_step_log = []
 
-    def train(self, max_train_steps, max_episode_steps, batch_size, ppo_epochs_base):
+    def train(self, max_train_steps, max_episode_steps, batch_size, ppo_epochs):
         """
         Train
         """
+        with open("reward.log", "w") as f:
+            pass
 
         state, info = self.env.reset()
         state = torch.tensor(np.array(state), dtype=torch.float32, device=self.device)
@@ -73,7 +77,8 @@ class PPOTrainer:
             # Collect data for one batch
             self.rollout_buffer.clear()
             for _ in range(batch_size):
-                action, log_prob, value = self.agent.select_action(state)
+                with torch.no_grad():
+                    action, log_prob, value = self.agent.select_action(state)
                 next_state, reward, done, truncated, info = self.env.step(action)
 
                 total_reward += reward
@@ -96,6 +101,8 @@ class PPOTrainer:
                     state = torch.tensor(np.array(state), dtype=torch.float32, device=self.device)
 
                     print(f"Episode: {self.episode + 1}      Rewards: {total_reward}      Steps: {self.total_steps}")
+                    with open("reward.log", "a") as f:
+                        f.write(f"Episode: {self.episode + 1}      Rewards: {total_reward}      Steps: {self.total_steps}\n")
                     self.train_reward_log.append(total_reward)
                     self.train_step_log.append(self.total_steps)
                     self.episode += 1
@@ -106,13 +113,12 @@ class PPOTrainer:
                 _, next_value = self.agent.model.forward(state)
                 last_value = next_value.item()
 
-            advantages, returns = self.agent.compute_advantages_returns(
-                self.rollout_buffer, last_value
-            )
+                advantages, returns = self.agent.compute_advantages_returns(
+                    self.rollout_buffer, last_value
+                )
+
             # PPO update
-            # Max reward = 21 shifting rewards to [0, 42] with scale factor 20
-            ppo_epochs_update = int(ppo_epochs_base + ((torch.mean(returns).item() + 21) / 42) ** 3 * 95)
-            self.agent.update(self.rollout_buffer, advantages, returns, ppo_epochs_update)
+            self.agent.update(self.rollout_buffer, advantages, returns, ppo_epochs, 64)
         torch.save(self.agent.model.state_dict(), './model.pt')
 
     def evaluate(self, max_episode_steps, episodes=10):

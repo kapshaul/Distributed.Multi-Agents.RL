@@ -151,3 +151,59 @@ class CustomConv2D(nn.Module):
         # Element-wise multiply the weight with scale factor
         scaled_w = self.weights * self.scale
         return F.conv2d(x, scaled_w, bias=self.bias, stride=self.stride, padding=self.padding)
+
+
+# Customized multi-head attention
+class CustomMultiheadAttention(nn.Module):
+    def __init__(self, embed_dim, num_heads, batch_first=True):
+        super(CustomMultiheadAttention, self).__init__()
+        assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.batch_first = batch_first
+
+        # Projections for query, key, value
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Output projection
+        self.out_proj = CustomLinear(embed_dim, embed_dim)
+
+    def forward(self, query, key, value):
+        if not self.batch_first:
+            # Convert (seq_len, batch, embed_dim) to (batch, seq_len, embed_dim)
+            query = query.transpose(0, 1)
+            key = key.transpose(0, 1)
+            value = value.transpose(0, 1)
+
+        B, T, _ = query.size()
+
+        # Linear projections
+        Q = self.q_proj(query)
+        K = self.k_proj(key)
+        V = self.v_proj(value)
+
+        # Reshape to (B, num_heads, T, head_dim)
+        Q = Q.view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+        K = K.view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+        V = V.view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # Scaled dot-product attention
+        attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / (self.head_dim ** 0.5)
+        attn_weights = F.softmax(attn_scores, dim=-1)
+        context = torch.matmul(attn_weights, V)
+
+        # Concatenate heads
+        context = context.transpose(1, 2).contiguous().view(B, T, self.embed_dim)
+
+        # Final projection
+        output = self.out_proj(context)
+
+        if not self.batch_first:
+            # Convert back to (seq_len, batch, embed_dim)
+            output = output.transpose(0, 1)
+
+        return output, attn_weights
