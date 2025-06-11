@@ -170,7 +170,7 @@ class CustomMultiheadAttention(nn.Module):
         self.v_proj = nn.Linear(embed_dim, embed_dim)
 
         # Output projection
-        self.out_proj = CustomLinear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
 
     def forward(self, query, key, value):
         if not self.batch_first:
@@ -197,10 +197,10 @@ class CustomMultiheadAttention(nn.Module):
         context = torch.matmul(attn_weights, V)
 
         # Concatenate heads
-        context = context.transpose(1, 2).contiguous().view(B, T, self.embed_dim)
+        output = context.transpose(1, 2).contiguous().view(B, T, self.embed_dim)
 
         # Final projection
-        output = self.out_proj(context)
+        #output = self.out_proj(context)
 
         if not self.batch_first:
             # Convert back to (seq_len, batch, embed_dim)

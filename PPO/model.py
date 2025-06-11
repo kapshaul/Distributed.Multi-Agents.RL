@@ -93,7 +93,7 @@ class PPONetwork_CNN(nn.Module):
 
         self.conv1 = nn.Sequential(
             # [N, 32, 20, 20]
-            nn.Conv2d(4, 32, kernel_size=8, stride=4, bias=True),
+            nn.Conv2d(4, 16, kernel_size=8, stride=4, bias=True),
             #CustomConv2D(4, 16, kernel_size=8, stride=4, m=0.0, bias=True),
             #nn.AvgPool2d(4, 4),
             nn.ReLU(),
@@ -101,45 +101,44 @@ class PPONetwork_CNN(nn.Module):
 
         self.conv2 = nn.Sequential(
             # [N, 64, 9, 9]
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, bias=True),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2, bias=True),
             #CustomConv2D(16, 32, kernel_size=4, stride=2, m=0.0, bias=True),
             nn.ReLU(),
         )
 
         self.conv3 = nn.Sequential(
             # [N, 64, 7, 7]
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, bias=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, bias=True),
             #CustomConv2D(32, 32, kernel_size=3, stride=1, m=0.0, bias=True),
             nn.ReLU(),
         )
 
-        #self.attn = nn.MultiheadAttention(embed_dim=64, num_heads=8, batch_first=True)
-        self.attn = CustomMultiheadAttention(embed_dim=64, num_heads=8, batch_first=True)
-        self.norm1 = nn.LayerNorm(64)
+        self.attn = nn.MultiheadAttention(embed_dim=32, num_heads=16, batch_first=True)
+        #self.attn = CustomMultiheadAttention(embed_dim=64, num_heads=8, batch_first=True)
+        self.norm = nn.LayerNorm(32)
 
         # Common layer
         self.full_rank = nn.Sequential(
             #nn.Linear(7*7*64, hidden_size),
             #FeatureTransform(hidden_size),
-            CustomLinear(7 * 7 * 64, hidden_size, 1.0, 0.0),
+            CustomLinear(7 * 7 * 32, hidden_size, 1.0, 0.0),
             #nn.Softmax(dim=-1),
             #nn.ReLU(),
         )
 
         # Common layer
-        self.common2 = nn.Sequential(
-            nn.Linear(7 * 7 * 64, 7 * 7 * 64),
+        self.common = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
         )
-        self.norm2 = nn.LayerNorm(7 * 7 * 64)
 
         # Policy layer
         self.policy = nn.Sequential(
-            nn.Linear(7 * 7 * 64, action_dim),
+            nn.Linear(hidden_size, action_dim),
         )
         # Value layer
         self.value = nn.Sequential(
-            nn.Linear(7 * 7 * 64, 1),
+            nn.Linear(hidden_size, 1),
         )
 
         nn.init.zeros_(self.policy[0].weight)
@@ -160,18 +159,18 @@ class PPONetwork_CNN(nn.Module):
         x = self.conv3(x)
 
         # B, F, H, W = x.shape
-        x = x.view(-1, 7 * 7, 64)
+        x = x.view(-1, 7 * 7, 32)
 
         #x = x.flatten(start_dim=1)
 
-        features, _ = self.attn(x, x, x)
-        features = self.norm1(features + x)
-        features = features.flatten(start_dim=1)
+        out, _ = self.attn(x, x, x)
+        out = self.norm(out + x)
+        out = out.flatten(start_dim=1)
 
-        out = self.common2(features)
-        out = self.norm2(out + features)
-        logits = self.policy(out)
-        value = self.value(out)
+        features = self.full_rank(out)
+        features = self.common(features)
+        logits = self.policy(features)
+        value = self.value(features)
         return logits, value
 
     def get_action(self, state):
