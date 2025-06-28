@@ -1,13 +1,14 @@
+import os
 import gym
 import torch
 import numpy as np
+from datetime import datetime
 from gym.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
 
 from agent import PPOAgent
 from memory import RolloutBuffer
 from utils.preprocess import FrameSkipWrapper
 
-from model import PPONetwork, PPONetwork_CNN
 
 
 class PPOTrainer:
@@ -63,11 +64,19 @@ class PPOTrainer:
         self.train_reward_log, self.eval_reward_log = [], []
         self.train_step_log = []
 
+        # Create log directory if it doesn't exist
+        log_dir = os.path.join("result", "log")
+        os.makedirs(log_dir, exist_ok=True)
+        # Format current time (e.g., 2025-06-14_10-30-00)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # Set the full path with timestamp
+        self.reward_log_path = os.path.join(log_dir, f"reward_{timestamp}.log")
+
     def train(self, max_train_steps, max_episode_steps, batch_size, ppo_epochs):
         """
         Train
         """
-        with open("reward.log", "w") as f:
+        with open(self.reward_log_path, "w") as f:
             pass
 
         state, info = self.env.reset()
@@ -78,6 +87,7 @@ class PPOTrainer:
             self.rollout_buffer.clear()
             for _ in range(batch_size):
                 with torch.no_grad():
+                    self.agent.model.eval()
                     action, log_prob, value = self.agent.select_action(state)
                 next_state, reward, done, truncated, info = self.env.step(action)
 
@@ -101,7 +111,7 @@ class PPOTrainer:
                     state = torch.tensor(np.array(state), dtype=torch.float32, device=self.device)
 
                     print(f"Episode: {self.episode + 1}      Rewards: {total_reward}      Steps: {self.total_steps}")
-                    with open("reward.log", "a") as f:
+                    with open(self.reward_log_path, "a") as f:
                         f.write(f"Episode: {self.episode + 1}      Rewards: {total_reward}      Steps: {self.total_steps}\n")
                     self.train_reward_log.append(total_reward)
                     self.train_step_log.append(self.total_steps)
@@ -118,8 +128,9 @@ class PPOTrainer:
                 )
 
             # PPO update
-            self.agent.update(self.rollout_buffer, advantages, returns, ppo_epochs, 64)
-        torch.save(self.agent.model.state_dict(), './model.pt')
+            self.agent.model.train()
+            self.agent.update(self.rollout_buffer, advantages, returns, ppo_epochs, 1024)
+        torch.save(self.agent.model.state_dict(), 'model/model.pt')
 
     def evaluate(self, max_episode_steps, episodes=10):
         """

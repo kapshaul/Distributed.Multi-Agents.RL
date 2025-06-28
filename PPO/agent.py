@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
-from model import PPONetwork, PPONetwork_CNN
+from PPO.model.model import PPONetwork, PPONetwork_CNN
+
 
 
 class PPOAgent:
@@ -18,6 +19,7 @@ class PPOAgent:
         else:
             self.model = PPONetwork(state_dim, action_dim, hidden_size).to(device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        #layer_lr(optimizer=self.optimizer, model=self.model, target_layer_name="common", lr=lr/10)
         #self.optimizer = optim.RMSprop(self.model.parameters(), lr=lr)
         self.gamma = gamma
         self.lam = lam
