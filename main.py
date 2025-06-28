@@ -9,7 +9,7 @@ CONFIG_PATH_PPO = "PPO/config.ini"
 def main():
     # Load configuration
     config = configparser.ConfigParser()
-    
+
     config.read(CONFIG_PATH_PPO)
     ppo(config=config)
 
