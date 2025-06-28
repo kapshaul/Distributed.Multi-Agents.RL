@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Categorical
-from utils.model import CustomLinear, CustomConv2D, CustomMultiheadAttention, FeatureTransform
+from PPO.utils.model import CustomLinear, CustomConv2D, CustomMultiheadAttention, FeatureTransform
 
 
 
