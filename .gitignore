@@ -1,4 +1,6 @@
-PPO/model.pt
 /.idea
-PPO/result.png
+__pycache__/
+
 *.log
+*.png
+*.pt
