@@ -1,12 +1,13 @@
 import numpy as np
 import torch
 import configparser
-import os
 from tqdm import tqdm
 from datetime import datetime
 
 from train_evaluate import PPOTrainer
-from utils.plot import plot_curves, plot_curves_train
+from utils.plot import plot_curves_train
+
+
 
 # Load configuration
 config = configparser.ConfigParser()
@@ -41,24 +42,24 @@ ppo_epochs = int(config['PPO']['ppo_epochs'])
 evaluation_episodes = int(config['TRAINING']['evaluation_episodes'])
 num_iterations = int(config['TRAINING']['num_iterations'])
 
-def main():
+def ppo():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()  # Clears cache to free unused memory
         torch.cuda.ipc_collect()  # Collects unreferenced memory
 
     # PPO
-    PPO = PPOTrainer(ENV_ID, RENDER, hyperparameters)
+    ppo = PPOTrainer(ENV_ID, RENDER, hyperparameters)
 
     # Start to train the PPO agent
     print(f"\n[INFO] Training started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
     train_steps = max_train_steps // num_iterations
     for _ in tqdm(range(num_iterations), desc="Processing"):
         # Train the agent
-        PPO.train(train_steps, max_episode_steps, batch_size, ppo_epochs)
+        ppo.train(train_steps, max_episode_steps, batch_size, ppo_epochs)
 
     # Plot the result
-    plot_curves_train(PPO.train_reward_log, PPO.train_step_log)
+    plot_curves_train(ppo.train_reward_log, ppo.train_step_log)
 
 
 if __name__ == "__main__":
-    main()
+    ppo()
