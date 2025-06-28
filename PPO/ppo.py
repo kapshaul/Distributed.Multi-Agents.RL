@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import configparser
 from tqdm import tqdm
 from datetime import datetime
 
@@ -9,11 +8,7 @@ from PPO.utils.plot import plot_curves_train
 
 
 
-def ppo(config_path):
-    # Load configuration
-    config = configparser.ConfigParser()
-    config.read(config_path)
-
+def ppo(config):
     # Environment
     ENV_ID = config['ENVIRONMENT']['env_id']
     EVALUATION = config.getboolean('ENVIRONMENT', 'evaluation')
