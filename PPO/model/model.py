@@ -1,6 +1,8 @@
+import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 from utils.model import CustomLinear, CustomConv2D, CustomMultiheadAttention, FeatureTransform
+
 
 
 # PPO Network
@@ -121,24 +123,27 @@ class PPONetwork_CNN(nn.Module):
         self.full_rank = nn.Sequential(
             #nn.Linear(7*7*64, hidden_size),
             #FeatureTransform(hidden_size),
-            CustomLinear(7 * 7 * 32, hidden_size, 1.0, 0.0),
+            CustomLinear(7 * 7 * 32, 4096, 1.0, 0.0),
+            #nn.Dropout(p=0.15),
             #nn.Softmax(dim=-1),
             #nn.ReLU(),
         )
 
         # Common layer
         self.common = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(7 * 7 * 32, hidden_size),
             nn.ReLU(),
+            nn.Dropout(p=0.1),
         )
 
         # Policy layer
         self.policy = nn.Sequential(
-            nn.Linear(hidden_size, action_dim),
+            nn.Linear(hidden_size + 4096, action_dim),
         )
+
         # Value layer
         self.value = nn.Sequential(
-            nn.Linear(hidden_size, 1),
+            nn.Linear(hidden_size + 4096, 1),
         )
 
         nn.init.zeros_(self.policy[0].weight)
@@ -158,19 +163,21 @@ class PPONetwork_CNN(nn.Module):
         x = self.conv2(x)
         x = self.conv3(x)
 
+        x = x.flatten(start_dim=1)
+        features = self.full_rank(x)
+
         # B, F, H, W = x.shape
         x = x.view(-1, 7 * 7, 32)
-
-        #x = x.flatten(start_dim=1)
 
         out, _ = self.attn(x, x, x)
         out = self.norm(out + x)
         out = out.flatten(start_dim=1)
+        out = self.common(out)
 
-        features = self.full_rank(out)
-        features = self.common(features)
-        logits = self.policy(features)
-        value = self.value(features)
+        out = torch.cat([features, out], dim=1)
+
+        logits = self.policy(out)
+        value = self.value(out)
         return logits, value
 
     def get_action(self, state):
