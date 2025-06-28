@@ -5,9 +5,9 @@ import numpy as np
 from datetime import datetime
 from gym.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
 
-from agent import PPOAgent
-from memory import RolloutBuffer
-from utils.preprocess import FrameSkipWrapper
+from PPO.agent import PPOAgent
+from PPO.utils.memory import RolloutBuffer
+from PPO.utils.preprocess import FrameSkipWrapper
 
 
 
@@ -61,7 +61,7 @@ class PPOTrainer:
         self.rollout_buffer = RolloutBuffer()
 
         self.episode, self.total_steps = 0, 0
-        self.train_reward_log, self.eval_reward_log = [], []
+        self.train_reward_log, self.test_reward_log = [], []
         self.train_step_log = []
 
         # Create log directory if it doesn't exist
@@ -132,9 +132,9 @@ class PPOTrainer:
             self.agent.update(self.rollout_buffer, advantages, returns, ppo_epochs, 1024)
         torch.save(self.agent.model.state_dict(), 'model/model.pt')
 
-    def evaluate(self, max_episode_steps, episodes=10):
+    def test(self, max_episode_steps, episodes=10):
         """
-        Evaluate
+        Test
         """
 
         #self.env = gym.make(self.env_id, render_mode="human")
@@ -159,4 +159,4 @@ class PPOTrainer:
 
         avg_reward = sum(total_rewards) / len(total_rewards)
         print(f"Average Reward: {avg_reward}\n")
-        self.eval_reward_log.append(avg_reward)
+        self.test_reward_log.append(avg_reward)

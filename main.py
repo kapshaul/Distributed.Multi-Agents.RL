@@ -1,8 +1,9 @@
-from PPO import ppo
+from PPO.ppo import ppo
 
 
 def main():
-    ppo()
+    ppo(config_path="PPO/config.ini")
+
 
 if __name__ == "__main__":
     main()
