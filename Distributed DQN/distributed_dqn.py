@@ -34,7 +34,7 @@ ACTION_DICT = {
 # Register the environment
 env_CartPole = CartPoleEnv()
 
-# Set result saveing floder
+# Set results saveing floder
 result_floder = ENV_NAME
 result_file = ENV_NAME + "/result_file_1.txt"
 if not os.path.isdir(result_floder):

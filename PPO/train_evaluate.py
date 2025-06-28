@@ -65,7 +65,7 @@ class PPOTrainer:
         self.train_step_log = []
 
         # Create log directory if it doesn't exist
-        log_dir = os.path.join("result", "log")
+        log_dir = os.path.join("results", "log")
         os.makedirs(log_dir, exist_ok=True)
         # Format current time (e.g., 2025-06-14_10-30-00)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

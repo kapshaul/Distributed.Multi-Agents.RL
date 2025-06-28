@@ -57,5 +57,5 @@ def ppo(config):
         # Test the agent
         ppo.test(max_episode_steps, evaluation_episodes)
 
-    # Plot the result
+    # Plot the results
     plot_curves_train(ppo.train_reward_log, ppo.train_step_log)

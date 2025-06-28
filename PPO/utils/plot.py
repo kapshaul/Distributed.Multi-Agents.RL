@@ -22,7 +22,7 @@ def plot_curves(train_reward_log, val_reward_log, train_step_log, train_steps):
 
     fig.tight_layout()
     ax1.legend(loc="center")
-    plt.savefig("result/result.png", dpi=300, bbox_inches="tight")
+    plt.savefig("results/results.png", dpi=300, bbox_inches="tight")
     plt.show()
 
 def plot_curves_train(train_reward_log, train_step_log):
@@ -42,5 +42,5 @@ def plot_curves_train(train_reward_log, train_step_log):
 
     fig.tight_layout()
     ax1.legend(loc="center")
-    plt.savefig("result/result.png", dpi=300, bbox_inches="tight")
+    plt.savefig("results/results.png", dpi=300, bbox_inches="tight")
     plt.show()
