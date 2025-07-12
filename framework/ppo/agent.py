@@ -3,24 +3,26 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
-from PPO.model.model import PPONetwork, PPONetwork_CNN
+from .model.model import PPONetwork, PPONetwork_CNN
+from common import is_image_observation_env
 
 
 
 class PPOAgent:
     def __init__(self, state_dim, action_dim, hidden_size, lr, gamma, lam,
-                 ppo_clip_eps, value_coef, entropy_coef, device):
+                 ppo_clip_eps, value_coef, entropy_coef, is_image_env, device):
         self.device = device
 
         # Choose network architecture based on the provided state_dim.
         # Here, if state_dim has length 4, we assume an image-like state input and select a CNN.
-        if hasattr(state_dim, '__len__') and len(state_dim) == 4:
-            self.model = PPONetwork_CNN(state_dim, action_dim, hidden_size).to(device)
-        else:
+        if not is_image_env:
             self.model = PPONetwork(state_dim, action_dim, hidden_size).to(device)
+        else:
+            self.model = PPONetwork_CNN(state_dim, action_dim, hidden_size).to(device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         #layer_lr(optimizer=self.optimizer, model=self.model, target_layer_name="common", lr=lr/10)
         #self.optimizer = optim.RMSprop(self.model.parameters(), lr=lr)
+        
         self.gamma = gamma
         self.lam = lam
         self.ppo_clip_eps = ppo_clip_eps

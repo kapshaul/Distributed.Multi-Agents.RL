@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Categorical
-from PPO.utils.model import CustomLinear, CustomConv2D, CustomMultiheadAttention, FeatureTransform
+from .custom import CustomLinear, CustomConv2D, CustomMultiheadAttention, FeatureTransform
 
 
 
@@ -186,7 +186,7 @@ class PPONetwork_CNN(nn.Module):
         Sample an action
         Return action, log_prob, and value
         """
-
+        
         logits, value = self.forward(state)
         dist = Categorical(logits=logits)
         action = dist.sample()

@@ -103,11 +103,10 @@ class CustomLinear(nn.Module):
             self.mask = None
 
         # Scaler vector
-        #scale = torch.FloatTensor([np.sqrt(np.pi) / 2])
-        scale = torch.FloatTensor([5])
-        F = torch.randn(out_features) * scale
-        # scale = torch.FloatTensor([3])
-        # F = torch.rand(out_features) * scale
+        scale = torch.FloatTensor([np.sqrt(np.pi) / 2])
+        #F = torch.randn(out_features) * scale
+        #scale = torch.FloatTensor([2])
+        F = torch.rand(out_features)# * scale
         F[torch.rand(out_features) < m] = 1.0
 
         # Register constant vector or matrix into the buffer

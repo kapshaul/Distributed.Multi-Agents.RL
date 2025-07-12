@@ -1,22 +1,32 @@
 import os
-import gym
 import torch
 import numpy as np
 from datetime import datetime
-from gym.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
 
-from PPO.agent import PPOAgent
-from PPO.utils.memory import RolloutBuffer
-from PPO.utils.preprocess import FrameSkipWrapper
+import ale_py
+import gymnasium as gym
+from gymnasium.wrappers import ResizeObservation, FrameStackObservation
 
+from .agent import PPOAgent
+from .utils.memory import RolloutBuffer
+from common import is_image_observation_env
+            
 
 
 class PPOTrainer:
     def __init__(self, env_id, render, hyperparameters):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        is_cuda = torch.cuda.is_available()
+        if is_cuda:
+            current_device = torch.cuda.current_device()
+            gpu_model = torch.cuda.get_device_name(current_device)
+            print(f"CUDA is available: True | Using GPU: {gpu_model}")
+        else:
+            print("CUDA is available: False | Using CPU")
+        self.device = torch.device("cuda" if is_cuda else "cpu")
 
         # Hyper-parameters
         self.env_id = env_id
+        gym.register_envs(ale_py)
         self.hidden_size = hyperparameters["hidden_size"]
         self.learning_rate = hyperparameters["learning_rate"]
         self.gamma = hyperparameters["gamma"]
@@ -26,10 +36,22 @@ class PPOTrainer:
         self.entropy_coef = hyperparameters["entropy_coef"]
 
         # Create environment
-        if render:
-            self.env = gym.make(env_id, render_mode="human")
+        is_image_env = is_image_observation_env(env_id=env_id)
+        if not is_image_env:
+            self.env = gym.make(
+                env_id,
+                render_mode="rgb_array" if render else None,
+            )
         else:
-            self.env = gym.make(env_id)
+            self.env = gym.make(
+                id=env_id,
+                obs_type="grayscale",
+                #frame_skip=4,
+                render_mode="rgb_array" if render else None,
+            )
+            self.env = ResizeObservation(self.env, (84, 84))
+            self.env = FrameStackObservation(self.env, stack_size=4)
+
         # Log environment information
         print("===== Environment Information =====")
         print(f"Environment ID: {env_id}")
@@ -38,14 +60,7 @@ class PPOTrainer:
         print(
             f"Action Space Size: {self.env.action_space.n if isinstance(self.env.action_space, gym.spaces.Discrete) else self.env.action_space.shape}")
         print(f"Max Episode Steps: {self.env.spec.max_episode_steps if self.env.spec else 'Unknown'}")
-        print(f"Reward Range: {self.env.reward_range}")
         print(f"Environment Metadata: {self.env.metadata}")
-
-        if len(self.env.observation_space.shape) == 3:
-            self.env = FrameSkipWrapper(self.env, skip=4)
-            self.env = GrayScaleObservation(self.env, keep_dim=True)
-            self.env = ResizeObservation(self.env, shape=84)
-            self.env = FrameStack(self.env, num_stack=4)
 
         self.state_dim = self.env.observation_space.shape
         self.action_dim = self.env.action_space.n
@@ -55,7 +70,7 @@ class PPOTrainer:
             self.state_dim, self.action_dim, self.hidden_size,
             self.learning_rate, self.gamma, self.lam,
             self.ppo_clip_eps, self.value_coef, self.entropy_coef,
-            self.device
+            is_image_env, self.device
         )
 
         self.rollout_buffer = RolloutBuffer()

@@ -1,4 +1,4 @@
-from gym import Wrapper
+from gymnasium import Wrapper
 
 
 class FrameSkipWrapper(Wrapper):

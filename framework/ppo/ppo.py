@@ -3,8 +3,8 @@ import torch
 from tqdm import tqdm
 from datetime import datetime
 
-from PPO.train_evaluate import PPOTrainer
-from PPO.utils.plot import plot_curves_train
+from .train_evaluate import PPOTrainer
+from .utils.plot import plot_curves_train
 
 
 
